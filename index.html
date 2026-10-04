@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>첫사랑 프로젝트 — 공식 스토어</title>
+<style>
+  :root{ --pink:#ff5fa2; --pink2:#ff9ec2; --ink:#1a1420; --paper:#fdf7fb; --muted:#6b6472; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:"Pretendard","맑은 고딕","Malgun Gothic",system-ui,sans-serif;
+        color:var(--ink); background:var(--paper); line-height:1.65; }
+  a{ color:inherit; }
+  .wrap{ max-width:960px; margin:0 auto; padding:0 20px; }
+
+  /* 연령 게이트 */
+  #agegate{ position:fixed; inset:0; z-index:999; background:rgba(12,8,18,.96);
+            display:flex; align-items:center; justify-content:center; padding:20px; }
+  #agegate .box{ background:#1c1526; border:1px solid #ff8fbf55; border-radius:22px;
+                 max-width:460px; width:100%; padding:40px 32px; text-align:center; color:#f3eef7; }
+  #agegate h2{ font-size:1.5rem; margin-bottom:10px; color:var(--pink2); }
+  #agegate p{ color:#c9c2d4; font-size:.98rem; margin-bottom:24px; }
+  .btn{ display:inline-block; border:0; cursor:pointer; font-weight:800; font-size:1rem;
+        padding:14px 22px; border-radius:14px; text-decoration:none; transition:transform .12s, box-shadow .12s; }
+  .btn:hover{ transform:translateY(-2px); }
+  .btn-yes{ background:linear-gradient(135deg,var(--pink),#ff7db3); color:#fff;
+            box-shadow:0 8px 22px #ff5fa255; width:100%; margin-bottom:12px; }
+  .btn-no{ background:#2c2436; color:#b9b2c6; width:100%; }
+  #agegate .deny{ display:none; color:#ffb3c7; margin-top:18px; font-weight:700; }
+
+  /* 히어로 */
+  header.hero{ position:relative; color:#fff; text-align:center; padding:92px 20px 80px;
+    background:linear-gradient(rgba(10,8,20,.45),rgba(10,8,20,.75)), center/cover no-repeat url("hero.jpg"); }
+  header.hero h1{ font-size:2.6rem; letter-spacing:-1px; text-shadow:0 3px 14px #0008; }
+  header.hero .sub{ opacity:.92; margin-top:8px; font-size:1.05rem; text-shadow:0 2px 8px #0008; }
+  .badge19{ display:inline-block; margin-top:18px; background:#e4003a; color:#fff; font-weight:900;
+            border-radius:50%; width:58px; height:58px; line-height:58px; font-size:1.1rem;
+            box-shadow:0 4px 14px #0006; }
+  .hero .cta{ margin-top:26px; }
+  .btn-buy{ background:linear-gradient(135deg,var(--pink),#ff7db3); color:#fff; font-size:1.15rem;
+            padding:16px 40px; box-shadow:0 10px 26px #ff5fa255; }
+
+  section{ padding:56px 0; }
+  section h2{ font-size:1.7rem; margin-bottom:18px; color:var(--ink); }
+  .feat{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:18px; }
+  .card{ background:#fff; border:1px solid #0000000d; border-radius:18px; padding:22px;
+         box-shadow:0 6px 18px #1a142008; }
+  .card h3{ color:var(--pink); margin-bottom:6px; font-size:1.1rem; }
+  .card p{ color:var(--muted); font-size:.95rem; }
+
+  .price{ background:#1c1526; color:#fff; border-radius:24px; padding:40px; text-align:center;
+          box-shadow:0 14px 40px #1a142022; }
+  .price .amt{ font-size:3rem; font-weight:900; color:var(--pink2); }
+  .price .note{ color:#c9c2d4; margin:10px 0 24px; }
+  .steps{ counter-reset:s; list-style:none; margin-top:14px; }
+  .steps li{ counter-increment:s; background:#fff; border:1px solid #0000000d; border-radius:14px;
+             padding:16px 18px 16px 56px; position:relative; margin-bottom:12px; }
+  .steps li::before{ content:counter(s); position:absolute; left:16px; top:14px; width:28px; height:28px;
+    background:var(--pink); color:#fff; border-radius:50%; text-align:center; line-height:28px; font-weight:800; }
+  footer{ text-align:center; color:var(--muted); font-size:.85rem; padding:40px 20px 60px; }
+  .warn{ background:#fff4f8; border:1px solid #ff9ec255; color:#a3365f; border-radius:14px;
+         padding:14px 18px; font-size:.9rem; margin-top:18px; }
+</style>
+</head>
+<body>
+
+<!-- 만 19세 이상 연령 확인 게이트 -->
+<div id="agegate" role="dialog" aria-modal="true">
+  <div class="box">
+    <h2>🔞 연령 확인</h2>
+    <p>본 작품의 <b>구매</b>는 <b>만 19세 이상</b>만 가능합니다.<br>만 19세 이상이십니까?</p>
+    <button class="btn btn-yes" onclick="passAge()">예, 만 19세 이상입니다</button>
+    <button class="btn btn-no" onclick="denyAge()">아니오</button>
+    <div class="deny" id="denyMsg">죄송합니다. 만 19세 미만은 구매하실 수 없습니다.</div>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <h1>첫사랑 프로젝트</h1>
+    <div class="sub">― First Love Project · 벚꽃이 지기 전에 ―</div>
+    <div class="badge19">19</div>
+    <div class="cta"><a class="btn btn-buy" id="buyBtn" href="#buy">CD키 구매하기</a></div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>게임 소개</h2>
+    <p style="color:var(--muted)">한 학기 뒤 떠나는 전학생 '유나'와의, 끝이 정해진 첫사랑.
+      42개 챕터 · 호감도 시스템 · 4가지 엔딩 · 다회차(New Game+) · CG 갤러리.
+      당신의 선택이 그 애의 봄을 바꿉니다.</p>
+    <div class="feat" style="margin-top:22px">
+      <div class="card"><h3>분기 스토리</h3><p>선택과 호감도에 따라 달라지는 42장 + 복수 엔딩.</p></div>
+      <div class="card"><h3>다회차 플레이</h3><p>회차 보너스·CG 갤러리·완주 보상 '진 후일담'.</p></div>
+      <div class="card"><h3>내 캐릭터</h3><p>주인공 전신 일러스트를 직접 업로드, 계정에 저장.</p></div>
+      <div class="card"><h3>클라우드 세이브</h3><p>어느 기기에서든 로그인해 이어서 플레이.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="buy">
+  <div class="wrap">
+    <div class="price">
+      <div>첫사랑 프로젝트 · 정식판 CD키</div>
+      <div class="amt">₩9,900</div>
+      <div class="note">1 CD키 = 1 계정 영구 이용</div>
+      <!-- ▼▼ 실제 결제 링크(Gumroad/Itch.io/스토어)로 변경하세요 ▼▼ -->
+      <a class="btn btn-buy" id="payBtn" href="PAYMENT_URL_HERE" target="_blank" rel="noopener">결제하고 CD키 받기</a>
+      <div class="warn">⚠️ 결제는 만 19세 이상만 가능합니다. 결제 완료 시 이메일로 CD키가 발송됩니다.
+        (결제 처리사는 판매자가 연동하세요 — 이 버튼의 링크를 실제 결제 페이지로 교체)</div>
+    </div>
+
+    <h2 style="margin-top:46px">CD키 등록 방법</h2>
+    <ol class="steps">
+      <li>게임 실행 → <b>회원가입/로그인</b></li>
+      <li>로그인 후 뜨는 <b>CD키 입력</b> 창에 구매한 키를 입력</li>
+      <li>인증 완료 → 바로 플레이! (키는 계정에 영구 귀속)</li>
+    </ol>
+  </div>
+</section>
+
+<footer>
+  © 첫사랑 프로젝트 (First Love Project) · 본 스토어의 구매는 만 19세 이상만 가능합니다.<br>
+  문의: your-email@example.com
+</footer>
+
+<script>
+  // 연령 게이트: 통과 기록은 브라우저에 저장 (localStorage 막혀도 동작)
+  function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+  function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+  if (lsGet("age19ok") === "1") {
+    document.getElementById("agegate").style.display = "none";
+  }
+  function passAge(){
+    lsSet("age19ok","1");
+    document.getElementById("agegate").style.display = "none";
+  }
+  function denyAge(){
+    document.getElementById("denyMsg").style.display = "block";
+    // 구매 관련 버튼 비활성화
+    ["buyBtn","payBtn"].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el){ el.style.pointerEvents="none"; el.style.opacity=".4"; }
+    });
+    setTimeout(function(){ window.location.href="https://www.google.com"; }, 2500);
+  }
+</script>
+</body>
+</html>
