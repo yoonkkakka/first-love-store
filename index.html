@@ -110,10 +110,22 @@
         포스타입에서 결제하면 열리는 유료 포스트 안내에 따라 <b>CD키</b>를 받으실 수 있어요.</div>
     </div>
 
-    <h2 style="margin-top:46px">CD키 등록 방법</h2>
+    <h2 style="margin-top:46px">① 구매 후 CD키 받기 (자동 발송)</h2>
+    <p style="color:var(--muted)">포스타입에서 결제하면 보이는 <b>수령 코드</b>와 받을 <b>이메일</b>을 입력하세요.
+      입력 즉시 CD키가 메일로 자동 발송됩니다.</p>
+    <div class="card" style="max-width:520px; margin-top:14px">
+      <input id="cEmail" type="email" placeholder="이메일 주소 (예: me@example.com)"
+             style="width:100%;padding:13px 14px;border:1px solid #0000001a;border-radius:12px;font-size:1rem;margin-bottom:10px">
+      <input id="cCode" type="text" placeholder="수령 코드 (유료 포스트에 적혀 있음)"
+             style="width:100%;padding:13px 14px;border:1px solid #0000001a;border-radius:12px;font-size:1rem;margin-bottom:14px">
+      <button class="btn btn-buy" style="width:100%" onclick="claimKey()">CD키 메일로 받기</button>
+      <div id="claimMsg" style="margin-top:14px;font-weight:700;font-size:.95rem"></div>
+    </div>
+
+    <h2 style="margin-top:46px">② CD키 등록 방법</h2>
     <ol class="steps">
       <li>게임 실행 → <b>회원가입/로그인</b></li>
-      <li>로그인 후 뜨는 <b>CD키 입력</b> 창에 구매한 키를 입력</li>
+      <li>로그인 후 뜨는 <b>CD키 입력</b> 창에 메일로 받은 키를 입력</li>
       <li>인증 완료 → 바로 플레이! (키는 계정에 영구 귀속)</li>
     </ol>
   </div>
@@ -125,6 +137,23 @@
 </footer>
 
 <script>
+  const API = "https://first-love-api.onrender.com";
+  function claimKey(){
+    var email=(document.getElementById("cEmail").value||"").trim();
+    var code=(document.getElementById("cCode").value||"").trim();
+    var box=document.getElementById("claimMsg");
+    if(!email || !code){ box.style.color="#c0392b"; box.textContent="이메일과 수령 코드를 모두 입력해 주세요."; return; }
+    box.style.color="#6b6472"; box.textContent="발급 중… (서버가 깨어나는 데 시간이 걸릴 수 있어요)";
+    fetch(API+"/claim",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({email:email,code:code})})
+      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
+      .then(function(res){
+        if(res.ok){ box.style.color="#1e8e3e"; box.textContent="✅ "+(res.j.message||"CD키를 메일로 보냈어요!"); }
+        else{ box.style.color="#c0392b"; box.textContent="❌ "+(res.j.detail||"발급 실패"); }
+      })
+      .catch(function(){ box.style.color="#c0392b"; box.textContent="❌ 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."; });
+  }
+
   // 연령 게이트: 통과 기록은 브라우저에 저장 (localStorage 막혀도 동작)
   function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
   function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
