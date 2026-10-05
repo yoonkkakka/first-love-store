@@ -143,15 +143,30 @@
     var code=(document.getElementById("cCode").value||"").trim();
     var box=document.getElementById("claimMsg");
     if(!email || !code){ box.style.color="#c0392b"; box.textContent="이메일과 수령 코드를 모두 입력해 주세요."; return; }
-    box.style.color="#6b6472"; box.textContent="발급 중… (서버가 깨어나는 데 시간이 걸릴 수 있어요)";
-    fetch(API+"/claim",{method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({email:email,code:code})})
-      .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
-      .then(function(res){
-        if(res.ok){ box.style.color="#1e8e3e"; box.textContent="✅ "+(res.j.message||"CD키를 메일로 보냈어요!"); }
-        else{ box.style.color="#c0392b"; box.textContent="❌ "+(res.j.detail||"발급 실패"); }
-      })
-      .catch(function(){ box.style.color="#c0392b"; box.textContent="❌ 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."; });
+
+    function attempt(n){
+      box.style.color="#6b6472";
+      box.textContent = n>1 ? ("서버를 깨우는 중… ("+n+"/5) 잠시만요 🙏") : "발급 중…";
+      fetch(API+"/claim",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:email,code:code})})
+        .then(function(r){ return r.text().then(function(t){
+          var j={}; try{ j=JSON.parse(t); }catch(e){}
+          return {ok:r.ok, status:r.status, j:j};
+        }); })
+        .then(function(res){
+          // 502/503/504 = 아직 깨는 중 → 재시도
+          if(!res.ok && [429,500,502,503,504].indexOf(res.status)>=0 && n<5){
+            setTimeout(function(){ attempt(n+1); }, 6000); return;
+          }
+          if(res.ok){ box.style.color="#1e8e3e"; box.textContent="✅ "+(res.j.message||"CD키를 메일로 보냈어요! 메일함(스팸함 포함)을 확인해 주세요."); }
+          else{ box.style.color="#c0392b"; box.textContent="❌ "+(res.j.detail||("발급 실패 ("+res.status+")")); }
+        })
+        .catch(function(){
+          if(n<5){ setTimeout(function(){ attempt(n+1); }, 6000); }
+          else{ box.style.color="#c0392b"; box.textContent="❌ 서버에 연결할 수 없어요. 30초 후 다시 눌러주세요."; }
+        });
+    }
+    attempt(1);
   }
 
   // 연령 게이트: 통과 기록은 브라우저에 저장 (localStorage 막혀도 동작)
