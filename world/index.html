@@ -32,6 +32,7 @@
 <div id="crosshair" style="display:none"></div>
 <div id="hud" style="display:none">🏫 교실 CH.<b id="hChan">-</b> · 접속 <b id="hCount">1</b>/10</div>
 <div id="hint" style="display:none">이동 WASD · 시점 마우스 · 채팅 <b>Enter</b> · 마우스잠금해제 <b>Esc</b></div>
+<button id="backBtn" style="display:none;position:fixed;top:10px;right:12px;z-index:8;background:#1c1526dd;color:#ffd0e4;border:1px solid #ff8fbf66;border-radius:10px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer">✕ 게임으로</button>
 
 <div id="chat">
   <div id="chatlog"></div>
@@ -360,9 +361,18 @@ startBtn.addEventListener("click", () => {
   ov.style.display = "none";
   document.getElementById("hud").style.display = "block";
   document.getElementById("hint").style.display = "block";
+  document.getElementById("backBtn").style.display = "block";
   running = true;
   lockPointer();
   syncLoop(); chatLoop();
+});
+
+// 게임으로 돌아가기 (창 닫기 → Ren'Py 창이 다시 보임)
+document.getElementById("backBtn").addEventListener("click", () => {
+  try { fetch(API + "/chat/leave", { method: "POST", headers: H(), keepalive: true }); } catch (e) {}
+  try { window.close(); } catch (e) {}
+  // close가 막히면 안내
+  setTimeout(() => { ovmsg.textContent = "이 창을 닫으면 게임으로 돌아갑니다."; ov.style.display = "flex"; startBtn.style.display = "none"; running = false; }, 300);
 });
 
 initScene();
