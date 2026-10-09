@@ -137,9 +137,13 @@
     <p style="color:var(--muted)">구매 후 받은 <b>CD키</b>로 게임 내에서 로그인·인증하면 플레이할 수 있어요.
       최신 클라이언트는 아래에서 받으시고, 설치 후 게임에서 <b>업데이트 확인</b>으로 항상 최신 버전을 유지할 수 있어요.</p>
     <div class="card" style="max-width:560px; margin-top:14px">
-      <div id="verLine" style="color:var(--muted); margin-bottom:12px">최신 버전 확인 중…</div>
-      <a id="dlBtn" class="btn btn-buy" style="width:100%; pointer-events:none; opacity:.5" href="#">다운로드 준비 중…</a>
-      <div id="dlNotes" style="margin-top:14px; color:var(--muted); font-size:.9rem; white-space:pre-line"></div>
+      <div id="verLine" style="color:var(--muted); margin-bottom:10px">최신 버전 확인 중…</div>
+      <p style="color:var(--muted); font-size:.9rem; margin-bottom:10px">🔒 구매하신 <b>CD키</b>를 입력하면 다운로드가 열립니다. (구매자 전용)</p>
+      <input id="dlKey" type="text" placeholder="CD키 (예: ABCDE-FGHIJ-KLMNO-PQRST)"
+             style="width:100%;padding:13px 14px;border:1px solid #0000001a;border-radius:12px;font-size:1rem;margin-bottom:10px">
+      <button class="btn btn-buy" style="width:100%" onclick="getDownload()">⬇ 다운로드 받기</button>
+      <div id="dlMsg" style="margin-top:12px; font-weight:700; font-size:.95rem"></div>
+      <div id="dlNotes" style="margin-top:12px; color:var(--muted); font-size:.9rem; white-space:pre-line"></div>
     </div>
   </div>
 </section>
@@ -202,22 +206,35 @@
     setTimeout(function(){ window.location.href="https://www.google.com"; }, 2500);
   }
 
-  // 최신 버전/다운로드 링크 불러오기 (/version)
+  // 최신 버전 정보 (/version — URL은 포함 안 함, 구매자만 /download)
   fetch(API+"/version").then(function(r){ return r.json(); }).then(function(v){
-    var ver=v.version||"", url=v.url||"", size=v.size||"", notes=v.notes||"";
+    var ver=v.version||"", size=v.size||"", notes=v.notes||"";
     document.getElementById("verLine").textContent = "최신 버전: v"+ver+(size?(" · "+size):"");
-    var b=document.getElementById("dlBtn");
-    if(url){
-      b.href=url; b.target="_blank"; b.rel="noopener";
-      b.style.pointerEvents="auto"; b.style.opacity="1";
-      b.textContent="⬇ 게임 다운로드 (v"+ver+")";
-    } else {
-      b.textContent="다운로드 준비 중 (곧 제공돼요)";
-    }
     if(notes){ document.getElementById("dlNotes").textContent="변경사항\n"+notes; }
   }).catch(function(){
     document.getElementById("verLine").textContent="버전 정보를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
   });
+
+  // 구매자 전용 다운로드 (CD키 검증)
+  function getDownload(){
+    var key=(document.getElementById("dlKey").value||"").trim();
+    var box=document.getElementById("dlMsg");
+    if(!key){ box.style.color="#c0392b"; box.textContent="CD키를 입력해 주세요."; return; }
+    box.style.color="#6b6472"; box.textContent="확인 중…";
+    fetch(API+"/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({key:key})})
+      .then(function(r){ return r.text().then(function(t){ var j={}; try{j=JSON.parse(t);}catch(e){} return {ok:r.ok,status:r.status,j:j}; }); })
+      .then(function(res){
+        if(res.ok && res.j.url){
+          box.style.color="#1e8e3e";
+          box.innerHTML="✅ 확인됐어요! 다운로드가 시작되지 않으면 <a href='"+res.j.url+"' target='_blank' rel='noopener' style='color:#ff5fa2;font-weight:800'>여기를 클릭</a>하세요.";
+          window.open(res.j.url, "_blank", "noopener");
+        } else {
+          box.style.color="#c0392b";
+          box.textContent="❌ "+(res.j.detail||("오류 "+res.status));
+        }
+      })
+      .catch(function(){ box.style.color="#c0392b"; box.textContent="❌ 서버에 연결할 수 없어요. 잠시 후 다시 시도해 주세요."; });
+  }
 </script>
 </body>
 </html>
