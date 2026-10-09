@@ -87,7 +87,6 @@ function initScene() {
   const sun = new THREE.DirectionalLight(0xfff2e0, 0.9);
   sun.position.set(6, 14, 8); scene.add(sun);
 
-  const tl = new THREE.TextureLoader();
   // 바닥
   const floorMat = new THREE.MeshLambertMaterial({ color: 0xd9c3a0 });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x * 2, ROOM.z * 2), floorMat);
@@ -112,12 +111,6 @@ function initScene() {
   const board = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.1),
     new THREE.MeshLambertMaterial({ color: 0x2e4b3a }));
   board.position.set(0, 1.8, -ROOM.z + 0.06); scene.add(board);
-  tl.load("classroom.jpg", (tex) => {
-    // 교실 이미지를 뒤쪽 벽 대형 벽화로
-    const mural = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x * 2 - 1, 3.0),
-      new THREE.MeshBasicMaterial({ map: tex }));
-    mural.position.set(0, 1.7, ROOM.z - 0.05); mural.rotation.y = Math.PI; scene.add(mural);
-  });
 
   // 창문(좌측 벽에 파란 유리 느낌)
   for (let i = -2; i <= 2; i++) {
