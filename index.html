@@ -131,6 +131,19 @@
   </div>
 </section>
 
+<section id="download">
+  <div class="wrap">
+    <h2>게임 다운로드</h2>
+    <p style="color:var(--muted)">구매 후 받은 <b>CD키</b>로 게임 내에서 로그인·인증하면 플레이할 수 있어요.
+      최신 클라이언트는 아래에서 받으시고, 설치 후 게임에서 <b>업데이트 확인</b>으로 항상 최신 버전을 유지할 수 있어요.</p>
+    <div class="card" style="max-width:560px; margin-top:14px">
+      <div id="verLine" style="color:var(--muted); margin-bottom:12px">최신 버전 확인 중…</div>
+      <a id="dlBtn" class="btn btn-buy" style="width:100%; pointer-events:none; opacity:.5" href="#">다운로드 준비 중…</a>
+      <div id="dlNotes" style="margin-top:14px; color:var(--muted); font-size:.9rem; white-space:pre-line"></div>
+    </div>
+  </div>
+</section>
+
 <footer>
   © 첫사랑 프로젝트 (First Love Project) · 본 스토어의 구매는 만 19세 이상만 가능합니다.<br>
   문의: your-email@example.com
@@ -158,7 +171,7 @@
           if(!res.ok && [429,500,502,503,504].indexOf(res.status)>=0 && n<5){
             setTimeout(function(){ attempt(n+1); }, 6000); return;
           }
-          if(res.ok){ box.style.color="#1e8e3e"; box.textContent="✅ "+(res.j.message||"CD키를 메일로 보냈어요! 메일함(스팸함 포함)을 확인해 주세요."); }
+          if(res.ok){ box.style.color="#1e8e3e"; box.innerHTML="✅ "+(res.j.message||"CD키를 메일로 보냈어요! 메일함(스팸함 포함)을 확인해 주세요.")+" <a href='#download' style='color:#ff5fa2;font-weight:800'>→ 게임 다운로드</a>"; }
           else{ box.style.color="#c0392b"; box.textContent="❌ "+(res.j.detail||("발급 실패 ("+res.status+")")); }
         })
         .catch(function(){
@@ -188,6 +201,23 @@
     });
     setTimeout(function(){ window.location.href="https://www.google.com"; }, 2500);
   }
+
+  // 최신 버전/다운로드 링크 불러오기 (/version)
+  fetch(API+"/version").then(function(r){ return r.json(); }).then(function(v){
+    var ver=v.version||"", url=v.url||"", size=v.size||"", notes=v.notes||"";
+    document.getElementById("verLine").textContent = "최신 버전: v"+ver+(size?(" · "+size):"");
+    var b=document.getElementById("dlBtn");
+    if(url){
+      b.href=url; b.target="_blank"; b.rel="noopener";
+      b.style.pointerEvents="auto"; b.style.opacity="1";
+      b.textContent="⬇ 게임 다운로드 (v"+ver+")";
+    } else {
+      b.textContent="다운로드 준비 중 (곧 제공돼요)";
+    }
+    if(notes){ document.getElementById("dlNotes").textContent="변경사항\n"+notes; }
+  }).catch(function(){
+    document.getElementById("verLine").textContent="버전 정보를 불러오지 못했어요. 잠시 후 새로고침해 주세요.";
+  });
 </script>
 </body>
 </html>
