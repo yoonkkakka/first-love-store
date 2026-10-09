@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>첫사랑 프로젝트 — 3D 교실 월드</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#0a0a12;font-family:"Pretendard","맑은 고딕",sans-serif;color:#fff}
+  #c{display:block;width:100%;height:100%}
+  #crosshair{position:fixed;left:50%;top:50%;width:8px;height:8px;margin:-4px 0 0 -4px;border-radius:50%;background:#fff8;pointer-events:none;mix-blend-mode:difference}
+  #hud{position:fixed;top:12px;left:12px;font-size:14px;color:#ffd9ec;text-shadow:0 1px 3px #000;pointer-events:none}
+  #hud b{color:#fff}
+  #overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,8,18,.92);z-index:10;text-align:center;padding:24px}
+  #overlay .box{max-width:460px}
+  #overlay h1{font-size:1.8rem;color:#ff9ec2;margin-bottom:10px}
+  #overlay p{color:#cfc9d8;line-height:1.7;margin-bottom:8px;font-size:.98rem}
+  #overlay .key{display:inline-block;background:#2c2436;border:1px solid #ffffff22;border-radius:6px;padding:2px 9px;margin:2px;font-weight:700}
+  #startBtn{margin-top:18px;background:linear-gradient(135deg,#ff5fa2,#ff7db3);color:#fff;border:0;border-radius:14px;padding:14px 30px;font-size:1.05rem;font-weight:800;cursor:pointer}
+  #startBtn:disabled{opacity:.5;cursor:default}
+  #chat{position:fixed;left:12px;bottom:12px;width:min(380px,46vw);z-index:5}
+  #chatlog{max-height:200px;overflow:hidden;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;margin-bottom:6px}
+  #chatlog .m{background:#0008;border-radius:8px;padding:4px 9px;font-size:13px;line-height:1.35;width:fit-content;max-width:100%;text-shadow:0 1px 2px #000}
+  #chatlog .m b{color:#ff9ec2}
+  #chatrow{display:none;gap:6px}
+  #chatinput{flex:1;background:#1c1526ee;border:1px solid #ff8fbf55;border-radius:10px;color:#fff;padding:9px 12px;font-size:14px;outline:none}
+  #hint{position:fixed;right:12px;bottom:12px;font-size:12px;color:#aaa;text-shadow:0 1px 2px #000;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="crosshair" style="display:none"></div>
+<div id="hud" style="display:none">🏫 교실 CH.<b id="hChan">-</b> · 접속 <b id="hCount">1</b>/10</div>
+<div id="hint" style="display:none">이동 WASD · 시점 마우스 · 채팅 <b>Enter</b> · 마우스잠금해제 <b>Esc</b></div>
+
+<div id="chat">
+  <div id="chatlog"></div>
+  <div id="chatrow"><input id="chatinput" maxlength="200" placeholder="메시지 입력 후 Enter…" autocomplete="off"></div>
+</div>
+
+<div id="overlay"><div class="box">
+  <h1>🏫 3D 교실 월드</h1>
+  <p id="ovmsg">접속 준비 중…</p>
+  <p style="color:#8d8698;font-size:.88rem">이동 <span class="key">W</span><span class="key">A</span><span class="key">S</span><span class="key">D</span>
+     시점 <span class="key">마우스</span> 채팅 <span class="key">Enter</span></p>
+  <button id="startBtn" disabled>입장</button>
+</div></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+const API = "https://first-love-api.onrender.com";
+
+// ── 토큰 (게임이 #token=... 로 전달) ──
+let TOKEN = "";
+if (location.hash.indexOf("token=") >= 0) {
+  TOKEN = decodeURIComponent(location.hash.split("token=")[1].split("&")[0]);
+  history.replaceState(null, "", location.pathname + location.search); // URL에서 토큰 숨김
+}
+const H = () => ({ "Authorization": "Bearer " + TOKEN, "Content-Type": "application/json" });
+
+const ov = document.getElementById("overlay");
+const ovmsg = document.getElementById("ovmsg");
+const startBtn = document.getElementById("startBtn");
+
+// ── three.js 기본 ──
+let renderer, scene, camera;
+let yaw = 0, pitch = 0;
+const keys = {};
+let myChannel = 0, running = false;
+const EYE = 1.6, SPEED = 4.2;
+const ROOM = { x: 11, z: 14 }; // 반경(절반)
+const clock = new THREE.Clock();
+
+function initScene() {
+  renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("c"), antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xbfe0ff);
+  scene.fog = new THREE.Fog(0xbfe0ff, 30, 60);
+
+  camera = new THREE.PerspectiveCamera(72, innerWidth / innerHeight, 0.1, 200);
+  camera.position.set(0, EYE, ROOM.z - 2);
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const sun = new THREE.DirectionalLight(0xfff2e0, 0.9);
+  sun.position.set(6, 14, 8); scene.add(sun);
+
+  const tl = new THREE.TextureLoader();
+  // 바닥
+  const floorMat = new THREE.MeshLambertMaterial({ color: 0xd9c3a0 });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x * 2, ROOM.z * 2), floorMat);
+  floor.rotation.x = -Math.PI / 2; scene.add(floor);
+  // 천장
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x * 2, ROOM.z * 2),
+    new THREE.MeshLambertMaterial({ color: 0xf4f0ea }));
+  ceil.rotation.x = Math.PI / 2; ceil.position.y = 3.4; scene.add(ceil);
+
+  // 벽
+  const wallMat = new THREE.MeshLambertMaterial({ color: 0xe8e2d6, side: THREE.DoubleSide });
+  function wall(w, h, x, y, z, ry) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), wallMat);
+    m.position.set(x, y, z); m.rotation.y = ry; scene.add(m); return m;
+  }
+  wall(ROOM.x * 2, 3.4, 0, 1.7, -ROOM.z, 0);          // 앞(칠판 쪽)
+  wall(ROOM.x * 2, 3.4, 0, 1.7, ROOM.z, Math.PI);     // 뒤
+  wall(ROOM.z * 2, 3.4, -ROOM.x, 1.7, 0, Math.PI / 2); // 좌(창문)
+  wall(ROOM.z * 2, 3.4, ROOM.x, 1.7, 0, -Math.PI / 2); // 우
+
+  // 칠판 + 교실 배경 무드(앞 벽)
+  const board = new THREE.Mesh(new THREE.PlaneGeometry(9, 2.1),
+    new THREE.MeshLambertMaterial({ color: 0x2e4b3a }));
+  board.position.set(0, 1.8, -ROOM.z + 0.06); scene.add(board);
+  tl.load("classroom.jpg", (tex) => {
+    // 교실 이미지를 뒤쪽 벽 대형 벽화로
+    const mural = new THREE.Mesh(new THREE.PlaneGeometry(ROOM.x * 2 - 1, 3.0),
+      new THREE.MeshBasicMaterial({ map: tex }));
+    mural.position.set(0, 1.7, ROOM.z - 0.05); mural.rotation.y = Math.PI; scene.add(mural);
+  });
+
+  // 창문(좌측 벽에 파란 유리 느낌)
+  for (let i = -2; i <= 2; i++) {
+    const win = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6),
+      new THREE.MeshBasicMaterial({ color: 0x9ed3ff, transparent: true, opacity: 0.55 }));
+    win.position.set(-ROOM.x + 0.07, 1.9, i * 3.2); win.rotation.y = Math.PI / 2; scene.add(win);
+  }
+
+  // 교탁
+  addDesk(0, -ROOM.z + 1.8, 1.6, 0.8, 0.9, 0x8a5a33);
+  // 학생 책상 격자
+  const deskMat = 0xcaa06a;
+  for (let r = 0; r < 4; r++)
+    for (let cI = 0; cI < 5; cI++)
+      addDesk((cI - 2) * 2.0, -ROOM.z + 4.5 + r * 2.4, 1.1, 0.7, 0.6, deskMat);
+
+  addEventListener("resize", () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+}
+
+function addDesk(x, z, w, h, d, color) {
+  const g = new THREE.Group();
+  const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d),
+    new THREE.MeshLambertMaterial({ color }));
+  top.position.y = h; g.add(top);
+  const legMat = new THREE.MeshLambertMaterial({ color: 0x555 });
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, 0.06), legMat);
+    leg.position.set(sx * (w / 2 - 0.05), h / 2, sz * (d / 2 - 0.05)); g.add(leg);
+  });
+  g.position.set(x, 0, z); scene.add(g);
+}
+
+// ── 아바타 ──
+const avatars = {};        // username -> {group, target:{x,z,rot}, imgLoaded}
+const avatarCache = {};    // username -> texture|null (fetched)
+let myName = "";
+
+function makeNameSprite(name) {
+  const cv = document.createElement("canvas"); cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext("2d");
+  ctx.font = "bold 34px sans-serif"; ctx.textAlign = "center";
+  ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.fillRect(0, 0, 256, 64);
+  ctx.fillStyle = "#ffd9ec"; ctx.fillText(name, 128, 44);
+  const tex = new THREE.CanvasTexture(cv);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sp.scale.set(1.6, 0.4, 1); sp.position.y = 2.3; return sp;
+}
+
+function placeholderTex() {
+  const cv = document.createElement("canvas"); cv.width = 128; cv.height = 256;
+  const ctx = cv.getContext("2d");
+  const grd = ctx.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, "#ff9ec2"); grd.addColorStop(1, "#8ecbff");
+  ctx.fillStyle = grd; ctx.fillRect(0, 0, 128, 256);
+  return new THREE.CanvasTexture(cv);
+}
+
+function buildAvatar(name, tex) {
+  const g = new THREE.Group();
+  const w = 1.0, h = 1.8;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.35, side: THREE.FrontSide });
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  front.position.y = h / 2; g.add(front);
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);   // 180° 회전 → 좌우반전된 뒷모습
+  back.position.y = h / 2; back.rotation.y = Math.PI; g.add(back);
+  g.add(makeNameSprite(name));
+  return g;
+}
+
+function ensureAvatar(p) {
+  if (p.username === myName) return;
+  if (!avatars[p.username]) {
+    const tex = (avatarCache[p.username] && avatarCache[p.username].tex) || placeholderTex();
+    const g = buildAvatar(p.username, tex);
+    scene.add(g);
+    avatars[p.username] = { group: g, target: { x: p.x, z: p.z, rot: p.rot }, imgLoaded: false };
+    g.position.set(p.x, 0, p.z);
+    fetchAvatarImg(p.username);
+  }
+  const a = avatars[p.username];
+  a.target.x = p.x; a.target.z = p.z; a.target.rot = p.rot;
+}
+
+function fetchAvatarImg(name) {
+  if (avatarCache[name] !== undefined) { applyAvatarImg(name); return; }
+  avatarCache[name] = null;
+  fetch(API + "/world/avatar?username=" + encodeURIComponent(name), { headers: H() })
+    .then(r => r.json()).then(j => {
+      const raw = j && j.image_b64;
+      if (!raw) return;
+      let ext = "png", data = raw;
+      if (raw.indexOf("|") >= 0) { ext = raw.split("|")[0]; data = raw.split("|")[1]; }
+      const img = new Image();
+      img.onload = () => {
+        const tex = new THREE.Texture(img); tex.needsUpdate = true;
+        avatarCache[name] = { tex }; applyAvatarImg(name);
+      };
+      img.src = "data:image/" + ext + ";base64," + data;
+    }).catch(() => {});
+}
+
+function applyAvatarImg(name) {
+  const a = avatars[name], c = avatarCache[name];
+  if (!a || !c || !c.tex || a.imgLoaded) return;
+  a.group.traverse(o => { if (o.isMesh && o.material && o.material.map !== undefined) { o.material.map = c.tex; o.material.needsUpdate = true; } });
+  a.imgLoaded = true;
+}
+
+// ── 네트워킹 ──
+let lastChatId = 0, syncFailed = false;
+
+async function syncLoop() {
+  if (!running) return;
+  try {
+    const r = await fetch(API + "/world/sync", {
+      method: "POST", headers: H(),
+      body: JSON.stringify({ x: camera.position.x, z: camera.position.z, rot: yaw })
+    });
+    if (r.status === 401 || r.status === 403) { fail("세션이 만료됐어요. 게임에서 다시 열어주세요."); return; }
+    const j = await r.json();
+    myChannel = j.channel; document.getElementById("hChan").textContent = j.channel;
+    const here = {};
+    (j.players || []).forEach(p => { here[p.username] = 1; ensureAvatar(p); });
+    // 떠난 사람 제거
+    Object.keys(avatars).forEach(n => { if (!here[n]) { scene.remove(avatars[n].group); delete avatars[n]; } });
+    document.getElementById("hCount").textContent = (j.players || []).length;
+    syncFailed = false;
+  } catch (e) { syncFailed = true; }
+  if (running) setTimeout(syncLoop, 380);
+}
+
+async function chatLoop() {
+  if (!running) return;
+  try {
+    if (myChannel) {
+      const r = await fetch(API + "/chat/poll?channel=" + myChannel + "&after=" + lastChatId, { headers: H() });
+      const j = await r.json();
+      (j.messages || []).forEach(m => { addChat(m.username, m.text); lastChatId = m.id; });
+    }
+  } catch (e) {}
+  if (running) setTimeout(chatLoop, 1500);
+}
+
+function addChat(name, text) {
+  const log = document.getElementById("chatlog");
+  const d = document.createElement("div"); d.className = "m";
+  d.innerHTML = "<b>" + esc(name) + "</b> " + esc(text);
+  log.appendChild(d);
+  while (log.children.length > 8) log.removeChild(log.firstChild);
+}
+function esc(s) { return (s || "").replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+function sendChat(text) {
+  if (!text.trim() || !myChannel) return;
+  fetch(API + "/chat/send", { method: "POST", headers: H(), body: JSON.stringify({ channel: myChannel, text: text.trim() }) }).catch(() => {});
+}
+
+// ── 입력 / 포인터락 ──
+const canvas = document.getElementById("c");
+let chatting = false;
+const chatrow = document.getElementById("chatrow"), chatinput = document.getElementById("chatinput");
+
+function lockPointer() { if (!chatting) canvas.requestPointerLock(); }
+document.addEventListener("pointerlockchange", () => {
+  const locked = document.pointerLockElement === canvas;
+  document.getElementById("crosshair").style.display = locked ? "block" : "none";
+});
+canvas.addEventListener("click", () => { if (running && !chatting) lockPointer(); });
+document.addEventListener("mousemove", (e) => {
+  if (document.pointerLockElement !== canvas) return;
+  yaw -= e.movementX * 0.0022;
+  pitch -= e.movementY * 0.0022;
+  pitch = Math.max(-1.2, Math.min(1.2, pitch));
+});
+addEventListener("keydown", (e) => {
+  if (chatting) {
+    if (e.key === "Enter") { sendChat(chatinput.value); chatinput.value = ""; toggleChat(false); }
+    else if (e.key === "Escape") { chatinput.value = ""; toggleChat(false); }
+    return;
+  }
+  if (e.key === "Enter") { toggleChat(true); e.preventDefault(); return; }
+  keys[e.code] = true;
+});
+addEventListener("keyup", (e) => { keys[e.code] = false; });
+
+function toggleChat(on) {
+  chatting = on;
+  chatrow.style.display = on ? "flex" : "none";
+  if (on) { document.exitPointerLock(); setTimeout(() => chatinput.focus(), 0); }
+  else { lockPointer(); }
+}
+
+// ── 메인 루프 ──
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (running && !chatting) {
+    const fwd = (keys["KeyW"] ? 1 : 0) - (keys["KeyS"] ? 1 : 0);
+    const str = (keys["KeyD"] ? 1 : 0) - (keys["KeyA"] ? 1 : 0);
+    if (fwd || str) {
+      const vx = (Math.sin(yaw) * -fwd + Math.cos(yaw) * str);
+      const vz = (Math.cos(yaw) * -fwd - Math.sin(yaw) * str);
+      const len = Math.hypot(vx, vz) || 1;
+      camera.position.x += (vx / len) * SPEED * dt;
+      camera.position.z += (vz / len) * SPEED * dt;
+      camera.position.x = Math.max(-ROOM.x + 0.5, Math.min(ROOM.x - 0.5, camera.position.x));
+      camera.position.z = Math.max(-ROOM.z + 0.5, Math.min(ROOM.z - 0.5, camera.position.z));
+    }
+  }
+  camera.position.y = EYE;
+  const dir = new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch));
+  camera.lookAt(camera.position.x - dir.x, camera.position.y + dir.y, camera.position.z - dir.z);
+
+  // 다른 플레이어 보간
+  for (const n in avatars) {
+    const a = avatars[n], g = a.group, t = a.target;
+    g.position.x += (t.x - g.position.x) * Math.min(1, dt * 8);
+    g.position.z += (t.z - g.position.z) * Math.min(1, dt * 8);
+    let dr = t.rot - g.rotation.y; while (dr > Math.PI) dr -= 2 * Math.PI; while (dr < -Math.PI) dr += 2 * Math.PI;
+    g.rotation.y += dr * Math.min(1, dt * 8);
+  }
+  if (renderer) renderer.render(scene, camera);
+}
+
+// ── 부팅 ──
+function fail(msg) { running = false; ov.style.display = "flex"; ovmsg.textContent = msg; startBtn.style.display = "none"; }
+
+async function boot() {
+  if (!TOKEN) { ovmsg.innerHTML = "이 월드는 <b>게임에서 '3D 교실'</b> 버튼으로 열어야 해요.<br>(로그인 토큰이 필요합니다)"; return; }
+  ovmsg.textContent = "서버 연결 중… (서버가 자고 있으면 최대 1분)";
+  try {
+    const r = await fetch(API + "/me", { headers: H() });
+    if (!r.ok) throw 0;
+    const j = await r.json(); myName = j.username || "";
+    ovmsg.innerHTML = "준비 완료! <b>" + esc(myName) + "</b> 님, 교실로 입장하세요.";
+    startBtn.disabled = false;
+  } catch (e) {
+    ovmsg.textContent = "서버에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.";
+    setTimeout(boot, 6000);
+  }
+}
+
+startBtn.addEventListener("click", () => {
+  ov.style.display = "none";
+  document.getElementById("hud").style.display = "block";
+  document.getElementById("hint").style.display = "block";
+  running = true;
+  lockPointer();
+  syncLoop(); chatLoop();
+});
+
+initScene();
+animate();
+boot();
+addEventListener("beforeunload", () => { try { navigator.sendBeacon; fetch(API + "/chat/leave", { method: "POST", headers: H(), keepalive: true }); } catch (e) {} });
+</script>
+</body>
+</html>
